@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SidoTrader — Deriv Bot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0C10;
+    --surface:#12151B;
+    --surface-2:#171B23;
+    --border:#232733;
+    --text:#E8EAED;
+    --text-dim:#8B92A1;
+    --rise:#2DD4A7;
+    --rise-dim:rgba(45,212,167,0.12);
+    --fall:#FF6B5B;
+    --fall-dim:rgba(255,107,91,0.12);
+    --warn:#F2B84B;
+    --accent:#5B8DEF;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  body{min-height:100vh;}
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:var(--accent);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  button{font-family:'Space Grotesk',sans-serif;cursor:pointer;border:none;border-radius:8px;font-weight:600;transition:transform .08s ease, filter .15s ease;}
+  button:active{transform:scale(0.97);}
+  button:disabled{opacity:0.4;cursor:not-allowed;}
+  input,select{
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:7px;
+    padding:9px 11px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:13.5px;
+    width:100%;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,141,239,0.18);}
+  label{font-size:11.5px;color:var(--text-dim);font-weight:500;letter-spacing:.02em;text-transform:uppercase;display:block;margin-bottom:6px;}
+  .field{margin-bottom:14px;}
+  .row{display:flex;gap:10px;}
+  .row > *{flex:1;}
+
+  /* ---------- status bar ---------- */
+  .statusbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:13px 22px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg, #0D1015, #0A0C10);
+    position:sticky;top:0;z-index:10;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--text-dim);box-shadow:0 0 0 0 transparent;}
+  .brand .dot.live{background:var(--rise);box-shadow:0 0 10px 1px var(--rise);}
+  .brand .dot.down{background:var(--fall);}
+  .brand-name{font-weight:700;font-size:17px;letter-spacing:-.01em;}
+  .brand-name span{color:var(--accent);}
+  .acct{display:flex;align-items:center;gap:20px;font-size:13px;}
+  .acct .lbl{color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;}
+  .acct .val{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14.5px;}
+  .acct-block{text-align:right;}
+  .disconnect-btn{background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:7px 13px;font-size:12px;}
+  .disconnect-btn:hover{border-color:var(--fall);color:var(--fall);}
+
+  /* ---------- connect screen ---------- */
+  .connect-wrap{min-height:calc(100vh - 60px);display:flex;align-items:center;justify-content:center;padding:24px;}
+  .connect-card{
+    width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);
+    border-radius:16px;padding:34px 32px;position:relative;overflow:hidden;
+  }
+  .connect-card::before{
+    content:"";position:absolute;top:-60px;right:-60px;width:180px;height:180px;border-radius:50%;
+    background:radial-gradient(circle, rgba(45,212,167,0.15), transparent 70%);
+  }
+  .connect-card h2{margin:0 0 6px;font-size:22px;}
+  .connect-card p.sub{color:var(--text-dim);font-size:13.5px;margin:0 0 26px;line-height:1.5;}
+  .appid-pill{
+    display:inline-flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:20px;padding:6px 13px;font-size:12px;color:var(--text-dim);margin-bottom:22px;
+  }
+  .appid-pill b{color:var(--text);font-family:'JetBrains Mono',monospace;}
+  .connect-btn{
+    width:100%;background:var(--accent);color:#fff;padding:12px;font-size:14.5px;border-radius:8px;margin-top:6px;
+  }
+  .connect-btn:hover{filter:brightness(1.08);}
+  .token-help{margin-top:18px;font-size:12px;color:var(--text-dim);line-height:1.6;}
+  .err-box{
+    background:var(--fall-dim);border:1px solid rgba(255,107,91,0.4);color:var(--fall);
+    padding:10px 13px;border-radius:8px;font-size:12.5px;margin-bottom:16px;display:none;
+  }
+  .toggle-vis{position:absolute;right:11px;top:34px;background:none;border:none;color:var(--text-dim);font-size:11px;padding:4px;}
+
+  /* ---------- dashboard ---------- */
+  #dashboard{padding:18px 22px 40px;}
+  .ribbon{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:14px 20px;display:flex;align-items:center;gap:22px;margin-bottom:18px;overflow:hidden;
+  }
+  .ribbon .sym{min-width:150px;}
+  .ribbon .sym .name{font-size:12px;color:var(--text-dim);margin-bottom:2px;}
+  .ribbon .sym .price{font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+  .ribbon canvas{flex:1;height:46px;}
+  .digit-chip{
+    width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:17px;background:var(--surface-2);
+    border:1px solid var(--border);flex-shrink:0;
+  }
+  .digit-chip.even{color:var(--rise);border-color:rgba(45,212,167,0.4);}
+  .digit-chip.odd{color:var(--fall);border-color:rgba(255,107,91,0.4);}
+
+  .grid{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start;}
+  @media (max-width: 880px){.grid{grid-template-columns:1fr;}}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;}
+  .panel h3{margin:0 0 16px;font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);}
+  .panel h3 span{color:var(--text);}
+
+  .pill-toggle{display:flex;gap:8px;margin-bottom:14px;}
+  .pill-toggle button{flex:1;padding:10px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);font-size:13px;}
+  .pill-toggle button.active.rise{background:var(--rise-dim);border-color:var(--rise);color:var(--rise);}
+  .pill-toggle button.active.fall{background:var(--fall-dim);border-color:var(--fall);color:var(--fall);}
+
+  .manual-row{display:flex;gap:10px;margin:18px 0 6px;}
+  .manual-row button{flex:1;padding:12px;font-size:13.5px;}
+  .btn-rise{background:var(--rise-dim);border:1px solid var(--rise);color:var(--rise);}
+  .btn-rise:hover{background:rgba(45,212,167,0.2);}
+  .btn-fall{background:var(--fall-dim);border:1px solid var(--fall);color:var(--fall);}
+  .btn-fall:hover{background:rgba(255,107,91,0.2);}
+
+  hr.div{border:none;border-top:1px solid var(--border);margin:20px 0;}
+
+  .checkrow{display:flex;align-items:center;gap:9px;margin-bottom:14px;}
+  .checkrow input[type=checkbox]{width:auto;accent-color:var(--accent);}
+  .checkrow label{margin:0;text-transform:none;font-size:13px;color:var(--text);}
+
+  .bot-btn{width:100%;padding:13px;font-size:14.5px;background:var(--accent);color:#fff;margin-top:4px;}
+  .bot-btn.running{background:var(--fall);}
+  .bot-btn:hover{filter:brightness(1.08);}
+
+  /* ---------- log panel ---------- */
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+  .stat{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;}
+  .stat .lbl{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.03em;margin-bottom:5px;}
+  .stat .val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:17px;}
+  .stat .val.pos{color:var(--rise);}
+  .stat .val.neg{color:var(--fall);}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{
+    text-align:left;color:var(--text-dim);font-weight:500;text-transform:uppercase;font-size:10.5px;
+    letter-spacing:.03em;padding:8px 10px;border-bottom:1px solid var(--border);
+  }
+  tbody td{padding:9px 10px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;}
+  tbody tr:last-child td{border-bottom:none;}
+  .tag{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;}
+  .tag.rise{background:var(--rise-dim);color:var(--rise);}
+  .tag.fall{background:var(--fall-dim);color:var(--fall);}
+  .pl.pos{color:var(--rise);}
+  .pl.neg{color:var(--fall);}
+  .status-open{color:var(--warn);}
+  .empty-log{padding:30px 10px;text-align:center;color:var(--text-dim);font-size:13px;}
+
+  .disclaimer{margin-top:18px;font-size:11.5px;color:var(--text-dim);line-height:1.6;text-align:center;}
+</style>
+</head>
+<body>
+
+<header class="statusbar">
+  <div class="brand">
+    <div class="dot" id="statusDot"></div>
+    <div class="brand-name">Sido<span>Trader</span></div>
+  </div>
+  <div class="acct" id="acctInfo" style="display:none;">
+    <div class="acct-block">
+      <div class="lbl">Account</div>
+      <div class="val" id="acctLogin">—</div>
+    </div>
+    <div class="acct-block">
+      <div class="lbl">Balance</div>
+      <div class="val" id="acctBalance">—</div>
+    </div>
+    <button class="disconnect-btn" id="disconnectBtn">Disconnect</button>
+  </div>
+</header>
+
+<!-- ===================== CONNECT SCREEN ===================== -->
+<div class="connect-wrap" id="connectScreen">
+  <div class="connect-card">
+    <h2>Connect to Deriv</h2>
+    <p class="sub">Authenticate with a Deriv API token (PAT) to load your account and start trading.</p>
+
+    <div class="appid-pill">App ID <b>1089</b> · Deriv WebSocket API v3</div>
+
+    <div class="err-box" id="connectErr"></div>
+
+    <div class="field" style="position:relative;">
+      <label for="tokenInput">API token</label>
+      <input type="password" id="tokenInput" placeholder="Paste your token here" autocomplete="off">
+      <button class="toggle-vis" id="toggleVis">SHOW</button>
+    </div>
+
+    <button class="connect-btn" id="connectBtn">Connect</button>
+
+    <div class="token-help">
+      Don't have a token? Go to <a href="https://app.deriv.com/account/api-token" target="_blank" rel="noopener">app.deriv.com → Settings → API token</a>
+      and create one with <b>Read</b>, <b>Trade</b>, and <b>Trading information</b> scopes enabled.
+      Your token is kept in memory only for this session — it's never saved or sent anywhere besides Deriv's API.
+    </div>
+  </div>
+</div>
+
+<!-- ===================== DASHBOARD ===================== -->
+<main id="dashboard" hidden>
+
+  <div class="ribbon">
+    <div class="sym">
+      <div class="name" id="ribbonSymName">Volatility 100 Index</div>
+      <div class="price mono" id="ribbonPrice">—</div>
+    </div>
+    <canvas id="sparkline" width="900" height="46"></canvas>
+    <div class="digit-chip" id="lastDigit">—</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- ---------- LEFT: trade config ---------- -->
+    <div class="panel">
+      <h3>Trade <span>setup</span></h3>
+
+      <div class="field">
+        <label for="symbolSelect">Market</label>
+        <select id="symbolSelect">
+          <option value="R_10">Volatility 10 Index</option>
+          <option value="R_25">Volatility 25 Index</option>
+          <option value="R_50">Volatility 50 Index</option>
+          <option value="R_75">Volatility 75 Index</option>
+          <option value="R_100" selected>Volatility 100 Index</option>
+          <option value="1HZ100V">Volatility 100 (1s) Index</option>
+        </select>
+      </div>
+
+      <label>Direction</label>
+      <div class="pill-toggle">
+        <button id="dirRise" class="active rise">▲ Rise</button>
+        <button id="dirFall" class="fall">▼ Fall</button>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="stakeInput">Stake</label>
+          <input type="number" id="stakeInput" value="1" min="0.35" step="0.01">
+        </div>
+        <div class="field">
+          <label for="durationInput">Duration</label>
+          <input type="number" id="durationInput" value="5" min="1" step="1">
+        </div>
+        <div class="field" style="max-width:90px;">
+          <label for="durationUnit">Unit</label>
+          <select id="durationUnit">
+            <option value="t">Ticks</option>
+            <option value="s">Sec</option>
+            <option value="m">Min</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="manual-row">
+        <button class="btn-rise" id="buyRiseBtn">Buy Rise</button>
+        <button class="btn-fall" id="buyFallBtn">Buy Fall</button>
+      </div>
+
+      <hr class="div">
+
+      <h3>Auto <span>bot</span></h3>
+
+      <div class="row">
+        <div class="field">
+          <label for="maxTrades">Max trades</label>
+          <input type="number" id="maxTrades" value="10" min="1" step="1">
+        </div>
+        <div class="field">
+          <label for="altDirection">Direction mode</label>
+          <select id="altDirection">
+            <option value="fixed">Fixed</option>
+            <option value="alternate">Alternate</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="checkrow">
+        <input type="checkbox" id="martEnable">
+        <label for="martEnable">Martingale on loss</label>
+      </div>
+      <div class="row" id="martRow" style="display:none;">
+        <div class="field">
+          <label for="martMultiplier">Multiplier</label>
+          <input type="number" id="martMultiplier" value="2" min="1.1" step="0.1">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="takeProfit">Take profit ($)</label>
+          <input type="number" id="takeProfit" placeholder="optional" min="0" step="0.01">
+        </div>
+        <div class="field">
+          <label for="stopLoss">Stop loss ($)</label>
+          <input type="number" id="stopLoss" placeholder="optional" min="0" step="0.01">
+        </div>
+      </div>
+
+      <button class="bot-btn" id="botToggleBtn">Start bot</button>
+
+      <div class="disclaimer">Synthetic indices are randomly generated. No strategy guarantees profit — trade only what you can afford to lose.</div>
+    </div>
+
+    <!-- ---------- RIGHT: log ---------- -->
+    <div class="panel">
+      <h3>Session <span>activity</span></h3>
+
+      <div class="stats-row">
+        <div class="stat"><div class="lbl">Trades</div><div class="val" id="statTrades">0</div></div>
+        <div class="stat"><div class="lbl">Wins</div><div class="val pos" id="statWins">0</div></div>
+        <div class="stat"><div class="lbl">Losses</div><div class="val neg" id="statLosses">0</div></div>
+        <div class="stat"><div class="lbl">Net P/L</div><div class="val" id="statPL">$0.00</div></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Market</th><th>Type</th><th>Stake</th><th>Result</th><th>P/L</th></tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+      </table>
+      <div class="empty-log" id="emptyLog">No trades yet — set up a trade on the left to get started.</div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+
+  const APP_ID = 1089;
+  let ws = null;
+  let token = null;
+  let currency = "USD";
+  let balanceSubId = null, ticksSubId = null;
+  let currentSymbol = "R_100";
+  let tickHistory = [];
+  let reconnectAttempts = 0;
+  let manualClose = false;
+
+  // bot state
+  let botRunning = false;
+  let botTradesLeft = 0;
+  let botBaseStake = 1;
+  let botCurrentStake = 1;
+  let botDirection = "CALL";
+  let botAltMode = "fixed";
+  let netPL = 0, totalTrades = 0, wins = 0, losses = 0;
+  let activeContractPending = false;
+
+  // -------------- DOM refs --------------
+  const $ = (id) => document.getElementById(id);
+  const connectScreen = $("connectScreen");
+  const dashboard = $("dashboard");
+  const acctInfo = $("acctInfo");
+  const statusDot = $("statusDot");
+  const connectErr = $("connectErr");
+  const sparkCanvas = $("sparkline");
+  const sparkCtx = sparkCanvas.getContext("2d");
+
+  let direction = "CALL"; // CALL = Rise, PUT = Fall
+
+  // -------------- UI helpers --------------
+  function showError(msg){
+    connectErr.textContent = msg;
+    connectErr.style.display = "block";
+  }
+  function clearError(){
+    connectErr.style.display = "none";
+  }
+  function setStatus(state){
+    statusDot.className = "dot" + (state === "live" ? " live" : state === "down" ? " down" : "");
+  }
+  function fmtMoney(n){
+    const sign = n > 0 ? "+" : "";
+    return sign + "$" + n.toFixed(2);
+  }
+
+  $("toggleVis").addEventListener("click", () => {
+    const inp = $("tokenInput");
+    const isPw = inp.type === "password";
+    inp.type = isPw ? "text" : "password";
+    $("toggleVis").textContent = isPw ? "HIDE" : "SHOW";
+  });
+
+  $("dirRise").addEventListener("click", () => {
+    direction = "CALL";
+    $("dirRise").classList.add("active");
+    $("dirFall").classList.remove("active");
+  });
+  $("dirFall").addEventListener("click", () => {
+    direction = "PUT";
+    $("dirFall").classList.add("active");
+    $("dirRise").classList.remove("active");
+  });
+
+  $("martEnable").addEventListener("change", (e) => {
+    $("martRow").style.display = e.target.checked ? "flex" : "none";
+  });
+
+  $("symbolSelect").addEventListener("change", (e) => {
+    switchSymbol(e.target.value);
+  });
+
+  // -------------- WebSocket --------------
+  function connect(){
+    clearError();
+    const tok = $("tokenInput").value.trim();
+    if (!tok){ showError("Enter a token first."); return; }
+    token = tok;
+    manualClose = false;
+    $("connectBtn").disabled = true;
+    $("connectBtn").textContent = "Connecting…";
+
+    ws = new WebSocket("wss://ws.derivws.com/websockets/v3?app_id=" + APP_ID);
+
+    ws.onopen = () => {
+      send({ authorize: token });
+    };
+
+    ws.onmessage = (evt) => {
+      const msg = JSON.parse(evt.data);
+      handleMessage(msg);
+    };
+
+    ws.onclose = () => {
+      setStatus("down");
+      if (!manualClose && dashboard.hasAttribute("hidden") === false){
+        attemptReconnect();
+      } else if ($("connectBtn").disabled){
+        $("connectBtn").disabled = false;
+        $("connectBtn").textContent = "Connect";
+      }
+    };
+
+    ws.onerror = () => { /* onclose will follow */ };
+  }
+
+  function attemptReconnect(){
+    if (reconnectAttempts >= 5 || manualClose) return;
+    reconnectAttempts++;
+    setTimeout(() => {
+      if (manualClose) return;
+      ws = new WebSocket("wss://ws.derivws.com/websockets/v3?app_id=" + APP_ID);
+      ws.onopen = () => send({ authorize: token });
+      ws.onmessage = (evt) => handleMessage(JSON.parse(evt.data));
+      ws.onclose = () => { setStatus("down"); attemptReconnect(); };
+      ws.onerror = () => {};
+    }, 3000);
+  }
+
+  function send(obj){
+    if (ws && ws.readyState === WebSocket.OPEN){
+      ws.send(JSON.stringify(obj));
+    }
+  }
+
+  function disconnect(){
+    manualClose = true;
+    stopBot();
+    if (ws) ws.close();
+    token = null;
+    balanceSubId = null; ticksSubId = null;
+    dashboard.hidden = true;
+    acctInfo.style.display = "none";
+    connectScreen.style.display = "flex";
+    setStatus("");
+    $("connectBtn").disabled = false;
+    $("connectBtn").textContent = "Connect";
+    $("tokenInput").value = "";
+  }
+
+  // -------------- message handling --------------
+  function handleMessage(msg){
+    if (msg.error){
+      handleApiError(msg);
+      return;
+    }
+    switch(msg.msg_type){
+      case "authorize": onAuthorize(msg); break;
+      case "balance": onBalance(msg); break;
+      case "tick": onTick(msg); break;
+      case "proposal": onProposal(msg); break;
+      case "buy": onBuy(msg); break;
+      case "proposal_open_contract": onContractUpdate(msg); break;
+    }
+  }
+
+  function handleApiError(msg){
+    const code = msg.error.code;
+    const message = msg.error.message || "Something went wrong.";
+    if (code === "InvalidToken" || code === "AuthorizationRequired"){
+      showError("That token wasn't accepted. Double-check it and try again.");
+      $("connectBtn").disabled = false;
+      $("connectBtn").textContent = "Connect";
+      if (ws) { manualClose = true; ws.close(); }
+      return;
+    }
+    // surface trading errors in the log area without crashing the bot loop
+    appendLogRow({
+      time: new Date(), symbol: currentSymbol, type: "—", stake: 0,
+      resultLabel: "Error", resultClass: "status-open", pl: null, note: message
+    });
+    if (botRunning){
+      activeContractPending = false;
+      // back off one trade so a single bad request doesn't loop forever
+      botTradesLeft = Math.max(0, botTradesLeft - 1);
+      if (botTradesLeft > 0) setTimeout(runNextBotTrade, 1200);
+      else stopBot();
+    }
+  }
+
+  function onAuthorize(msg){
+    const a = msg.authorize;
+    currency = a.currency;
+    connectScreen.style.display = "none";
+    dashboard.hidden = false;
+    acctInfo.style.display = "flex";
+    $("acctLogin").textContent = a.loginid;
+    $("acctBalance").textContent = Number(a.balance).toFixed(2) + " " + currency;
+    setStatus("live");
+    reconnectAttempts = 0;
+
+    send({ balance: 1, subscribe: 1 });
+    switchSymbol(currentSymbol);
+  }
+
+  function onBalance(msg){
+    const b = msg.balance;
+    if (b.id) balanceSubId = b.id;
+    $("acctBalance").textContent = Number(b.balance).toFixed(2) + " " + b.currency;
+  }
+
+  function switchSymbol(sym){
+    if (ticksSubId){ send({ forget: ticksSubId }); ticksSubId = null; }
+    currentSymbol = sym;
+    tickHistory = [];
+    drawSparkline();
+    $("ribbonSymName").textContent = $("symbolSelect").selectedOptions[0]
+      ? $("symbolSelect").selectedOptions[0].textContent : sym;
+    send({ ticks: sym, subscribe: 1 });
+  }
+
+  function onTick(msg){
+    const t = msg.tick;
+    if (t.subscription && t.subscription.id) ticksSubId = t.subscription.id;
+    const price = t.quote;
+    $("ribbonPrice").textContent = price.toFixed(t.pip_size || 2);
+    tickHistory.push(price);
+    if (tickHistory.length > 60) tickHistory.shift();
+    drawSparkline();
+
+    const priceStr = price.toFixed(t.pip_size || 2);
+    const lastDigit = parseInt(priceStr.replace(".", "").slice(-1), 10);
+    const chip = $("lastDigit");
+    chip.textContent = lastDigit;
+    chip.className = "digit-chip " + (lastDigit % 2 === 0 ? "even" : "odd");
+  }
+
+  function drawSparkline(){
+    const w = sparkCanvas.width, h = sparkCanvas.height;
+    sparkCtx.clearRect(0,0,w,h);
+    if (tickHistory.length < 2) return;
+    const min = Math.min(...tickHistory), max = Math.max(...tickHistory);
+    const range = (max - min) || 1;
+    sparkCtx.beginPath();
+    tickHistory.forEach((p, i) => {
+      const x = (i / (tickHistory.length - 1)) * w;
+      const y = h - ((p - min) / range) * (h - 8) - 4;
+      i === 0 ? sparkCtx.moveTo(x,y) : sparkCtx.lineTo(x,y);
+    });
+    const up = tickHistory[tickHistory.length-1] >= tickHistory[0];
+    sparkCtx.strokeStyle = up ? "#2DD4A7" : "#FF6B5B";
+    sparkCtx.lineWidth = 2;
+    sparkCtx.stroke();
+  }
+
+  // -------------- trading --------------
+  function requestProposal(contractType, stake, duration, durationUnit, symbol){
+    send({
+      proposal: 1,
+      amount: Number(stake),
+      basis: "stake",
+      contract_type: contractType,
+      currency: currency,
+      duration: Number(duration),
+      duration_unit: durationUnit,
+      symbol: symbol
+    });
+    pendingProposalMeta = { contractType, stake, symbol };
+  }
+
+  let pendingProposalMeta = null;
+  let lastTradeWasBot = false;
+
+  function onProposal(msg){
+    const p = msg.proposal;
+    send({ buy: p.id, price: p.ask_price });
+  }
+
+  function onBuy(msg){
+    const b = msg.buy;
+    send({ proposal_open_contract: 1, contract_id: b.contract_id, subscribe: 1 });
+  }
+
+  function onContractUpdate(msg){
+    const c = msg.proposal_open_contract;
+    if (c.is_sold === 1 || c.status === "sold"){
+      const profit = Number(c.profit);
+      const won = profit > 0;
+      totalTrades++; won ? wins++ : losses++;
+      netPL += profit;
+      updateStats();
+
+      appendLogRow({
+        time: new Date(),
+        symbol: c.underlying ? prettySymbol(c.underlying) : currentSymbol,
+        type: c.contract_type === "CALL" ? "Rise" : "Fall",
+        stake: c.buy_price,
+        resultLabel: won ? "Won" : "Lost",
+        resultClass: won ? "rise" : "fall",
+        pl: profit
+      });
+
+      if (c.subscription && c.subscription.id) send({ forget: c.subscription.id });
+      activeContractPending = false;
+
+      if (lastTradeWasBot && botRunning){
+        handleBotResult(won, profit);
+      }
+    }
+  }
+
+  function prettySymbol(code){
+    const opt = Array.from($("symbolSelect").options).find(o => o.value === code);
+    return opt ? opt.textContent : code;
+  }
+
+  function updateStats(){
+    $("statTrades").textContent = totalTrades;
+    $("statWins").textContent = wins;
+    $("statLosses").textContent = losses;
+    const plEl = $("statPL");
+    plEl.textContent = fmtMoney(netPL);
+    plEl.className = "val " + (netPL > 0 ? "pos" : netPL < 0 ? "neg" : "");
+  }
+
+  function appendLogRow({time, symbol, type, stake, resultLabel, resultClass, pl, note}){
+    $("emptyLog").style.display = "none";
+    const tr = document.createElement("tr");
+    const tag = type === "Rise" ? "rise" : type === "Fall" ? "fall" : "";
+    tr.innerHTML = `
+      <td>${time.toLocaleTimeString()}</td>
+      <td>${symbol}</td>
+      <td>${tag ? `<span class="tag ${tag}">${type}</span>` : type}</td>
+      <td>${stake ? Number(stake).toFixed(2) : "—"}</td>
+      <td class="${resultClass === 'rise' ? 'pl pos' : resultClass === 'fall' ? 'pl neg' : 'status-open'}">${resultLabel}${note ? ' · ' + note : ''}</td>
+      <td class="${pl > 0 ? 'pl pos' : pl < 0 ? 'pl neg' : ''}">${pl !== null && pl !== undefined ? fmtMoney(pl) : "—"}</td>
+    `;
+    $("logBody").prepend(tr);
+  }
+
+  // ---- manual trade buttons ----
+  $("buyRiseBtn").addEventListener("click", () => fireManualTrade("CALL"));
+  $("buyFallBtn").addEventListener("click", () => fireManualTrade("PUT"));
+
+  function fireManualTrade(contractType){
+    if (!token){ return; }
+    if (activeContractPending){ return; }
+    activeContractPending = true;
+    lastTradeWasBot = false;
+    const stake = $("stakeInput").value;
+    const duration = $("durationInput").value;
+    const unit = $("durationUnit").value;
+    requestProposal(contractType, stake, duration, unit, currentSymbol);
+  }
+
+  // -------------- bot --------------
+  $("botToggleBtn").addEventListener("click", () => {
+    botRunning ? stopBot() : startBot();
+  });
+
+  function startBot(){
+    if (!token) return;
+    botRunning = true;
+    botTradesLeft = parseInt($("maxTrades").value, 10) || 1;
+    botBaseStake = parseFloat($("stakeInput").value) || 1;
+    botCurrentStake = botBaseStake;
+    botDirection = direction;
+    botAltMode = $("altDirection").value;
+
+    $("botToggleBtn").textContent = "Stop bot";
+    $("botToggleBtn").classList.add("running");
+    runNextBotTrade();
+  }
+
+  function stopBot(){
+    botRunning = false;
+    $("botToggleBtn").textContent = "Start bot";
+    $("botToggleBtn").classList.remove("running");
+  }
+
+  function runNextBotTrade(){
+    if (!botRunning || botTradesLeft <= 0){ stopBot(); return; }
+    if (activeContractPending) return;
+
+    activeContractPending = true;
+    lastTradeWasBot = true;
+    const duration = $("durationInput").value;
+    const unit = $("durationUnit").value;
+    requestProposal(botDirection, botCurrentStake, duration, unit, currentSymbol);
+  }
+
+  function handleBotResult(won, profit){
+    botTradesLeft--;
+
+    // martingale adjustment
+    if ($("martEnable").checked){
+      if (won){
+        botCurrentStake = botBaseStake;
+      } else {
+        const mult = parseFloat($("martMultiplier").value) || 2;
+        botCurrentStake = +(botCurrentStake * mult).toFixed(2);
+      }
+    }
+
+    // alternate direction mode
+    if (botAltMode === "alternate"){
+      botDirection = botDirection === "CALL" ? "PUT" : "CALL";
+    }
+
+    // take profit / stop loss checks
+    const tp = parseFloat($("takeProfit").value);
+    const sl = parseFloat($("stopLoss").value);
+    if (!isNaN(tp) && netPL >= tp){ stopBot(); return; }
+    if (!isNaN(sl) && netPL <= -Math.abs(sl)){ stopBot(); return; }
+
+    if (botTradesLeft <= 0){ stopBot(); return; }
+    setTimeout(runNextBotTrade, 600);
+  }
+
+  // -------------- wire up connect/disconnect --------------
+  $("connectBtn").addEventListener("click", connect);
+  $("tokenInput").addEventListener("keydown", (e) => { if (e.key === "Enter") connect(); });
+  $("disconnectBtn").addEventListener("click", disconnect);
+
+})();
+</script>
+</body>
+</html>
